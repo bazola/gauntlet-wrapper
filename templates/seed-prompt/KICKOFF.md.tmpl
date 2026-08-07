@@ -1,0 +1,177 @@
+# Gauntlet Kickoff -- {{PROJECT_DISPLAY_NAME}}
+
+You are starting a gauntlet loop on this repository, run through gauntlet-wrapper. This
+file was typed into your session automatically, once, the first time this project's
+session started. Read it fully before doing anything else.
+
+## 1. Discovery (do this first, before writing anything)
+
+Do not assume this is a greenfield project. Read the existing repository: its code,
+tests, docs, CI config, and conventions. Determine what kind of project this actually
+is, then write that back to `.gauntlet/config.json`'s `projectType` field, choosing the
+closest match: `browser-canvas`, `browser-webgpu`, `cli`, `backend-service`, `library`,
+or `other`. This decision governs which performance-lane mechanics apply (see S6) --
+get it right before moving on.
+
+A quick heuristic scan of this repo suggested: **{{PROJECT_TYPE_HINT}}**. Treat that as
+a hint only, not a conclusion -- your own discovery decides the real answer.
+
+If the repository already has established architecture, style, or testing conventions,
+work within them. Do not restructure existing work to fit a preconceived template.
+
+## 2. Goal
+
+{{GOAL_MD_CONTENTS}}
+
+This is also kept at `.gauntlet/goal.md` and can change over time (edited by the human
+via the wrapper's Config tab, versioned in `.gauntlet/goal.meta.json` and
+`.gauntlet/goal-history/`). Re-read `.gauntlet/goal.md` at the start of every session --
+it may have changed since you last looked.
+
+## 3. Bars to author
+
+After discovery, draft the binding architecture/spec document(s) this project needs,
+appropriate to what you found in S1 -- a module contract, a feel/behavior spec, whatever
+the project actually calls for. Write these at the **repository root**, not under
+`.gauntlet/` -- they are real project documentation, not wrapper bookkeeping. If the
+scope of what you're about to commit to is large, consider flagging it to the human and
+pausing for a sanity check before build/critic loops start in earnest -- a judgment
+call, not a hard gate.
+
+## 4. Reference streams
+
+The human adds reference material through the wrapper's References tab. It lands in
+`.gauntlet/references/catalog.json` with three independent arrays:
+
+- `photo[]` -- still images, the visual-fidelity bar. Each entry has a `note` from the
+  human. Preprocess new entries as needed (tag content, extract detail crops) and record
+  derived state under `derived`.
+- `video[]` -- motion references, the temporal-fidelity bar. Preprocess into frame
+  strips for like-for-like A/B comparison, same discipline as stills.
+- `gameplay[]` -- free-text write-ups, **not files**: a goal, a description of the
+  current gap, and the human's own testing ideas. Each one starts `status: "raw"`.
+
+**Gameplay reference formalization** -- do this early in every session, and whenever a
+new raw gameplay reference appears: read every `gameplay[]` entry with
+`status: "raw"`, and for each one, draft one or more formal, ID'd testing requirements
+into `.gauntlet/progress/requirements.json` (`kind: "gameplay"`) -- an assertion, how
+it'll be measured/captured, and pass criteria. Then mark the source reference
+`status: "formalized"`, set `formalizedAt`, and list the requirement IDs it produced in
+`derivedRequirementIds`. Once formalized, a requirement is **standing** -- checked every
+round from then on, the same way every other requirement is.
+
+## 5. Reviewer taxonomy
+
+Two lanes are standing -- active every round, for every project, no matter what
+references exist:
+
+- **Performance** -- see S6. This lane gates the round: if this round's performance
+  evidence is stale, missing, or failing, every other lane's verdict this round still
+  gets recorded, but flagged `void: true` with a `voidReason`. Nothing is ever silently
+  dropped, but a round with a broken perf lane doesn't get to claim progress anywhere
+  else either.
+- **Correctness** -- your deterministic test suite, plus any invariant/solver-style
+  checks appropriate to the project, plus the mechanically-checkable pieces of
+  formalized gameplay requirements (`kind: "correctness"` requirements land here too).
+
+Three lanes are conditional -- active only once the matching reference stream has at
+least one entry:
+
+- **Visual Fidelity** (active once `references.photo` is non-empty) -- blind A/B, ours
+  vs. reference, unlabeled and in randomized order until the critic has picked a winner
+  and written the gap. You may split this into `visual-fidelity/materials-lighting-post`
+  and `visual-fidelity/geometry-silhouette` sub-lanes if the project has enough visual
+  surface for mesh/shading detail to otherwise dominate every verdict; otherwise run it
+  as one lane.
+- **Temporal/Motion Fidelity** (active once `references.video` is non-empty) --
+  frame-strip blind A/B, same cadence and frame count as the matching reference strip.
+- **Gameplay/Behavioral Fidelity** (active once at least one `references.gameplay` entry
+  is formalized) -- critic judges captured evidence (telemetry, scripted replays,
+  capture strips of the specific described behavior) against the formalized
+  requirements. This is distinct from Correctness: it's judging whether the result
+  matches stated design intent, not just whether an assertion mechanically passes.
+
+Cross-cutting rules, all lanes:
+
+- **Evidence-or-void.** A verdict cites the exact capture/evidence files this round
+  produced, or it is void and the round repeats. No description-only verdicts, ever.
+- **Builder != critic.** Critics are always separate subagents in fresh context -- goal,
+  bar, and this round's evidence only. Never the builder's reasoning, diffs, or excuses.
+  Spawn every critic subagent with `model: "{{REVIEWER_MODEL}}"` -- read this live from
+  `.gauntlet/config.json`'s `reviewerModel` every time, it may change between sessions,
+  don't cache it.
+- **Divergence rule** (Visual and Gameplay/Behavioral lanes only). Reference material is
+  a quality and style-language bar, never an identity target. Match the
+  rendering/interaction *language*; do not reproduce the reference's specific identity,
+  trade dress, or recognizable proprietary elements.
+- **One gap per lane per round.** A critic's verdict names the single biggest remaining
+  gap. The builder fixes that, not a laundry list.
+- **Blind A/B** (Visual and Temporal lanes). The critic receives the pair unlabeled, in
+  randomized order, and must pick the better one before writing the gap analysis.
+
+## 6. Performance lane mechanics
+
+Once you've determined `projectType` in S1:
+
+- **browser-canvas / browser-webgpu** -- check `.gauntlet/config.json`'s
+  `perfHarness.scaffolded` field. If a starter performance harness has already been
+  scaffolded into `harness/` (Playwright-driven frame-time histogram, heap trace, and a
+  hardware/adapter gate so evidence from a software renderer is void), build on it. If
+  not yet scaffolded, build the equivalent yourself: real hardware GPU, a frame-time
+  histogram with budgets, a heap-growth trace, and a startup gate that voids any run
+  that silently fell back to a software renderer.
+- **cli / backend-service / library / other** -- no starter harness applies. Build your
+  own harness that fills exactly this shape every round:
+
+{{PERF_CONTRACT_SCHEMA}}
+
+Whatever the mechanism, every round's performance evidence gets written as a
+`performanceGate` block in that generation's record (see S7) -- `evaluated`, `pass`,
+`evidence[]`, and `reason` if it failed. This is what S5's gating rule reads.
+
+## 7. Progress reporting contract
+
+You own `.gauntlet/progress/` entirely -- the wrapper only watches it and renders it, it
+never writes to it. Files:
+
+- `state.json` -- hot pointer: `currentGeneration`, `activeLanes`, `reviewerModel`
+  (mirror of config, for display). Update this whenever the round advances.
+- `requirements.json` -- the standing requirement set
+  (`kind: "gameplay" | "correctness"`), each with `id`, `assertion`, `measurement`,
+  `passCriteria`, `status`, `createdAtGeneration`, and `sourceReferenceId` for
+  gameplay-derived ones.
+- `generations/gen-NNNN.json` -- one **immutable** record per generation, written once
+  and never edited afterward. You declare and increment the generation number yourself
+  -- the wrapper never infers this. Each record needs: `generation`, `label`,
+  `createdAt`, `gitSha`/`gitDirty` (record the actual state of the repo, `gitSha: null`
+  if the worktree is dirty), `statusNote` (a human-readable one-paragraph summary --
+  this is what the human reads at a glance), `performanceGate`, `lanes[]` (one
+  `LaneVerdict` per active lane: `lane`, `winner`, `biggestGap`, `evidence[]`, `void`,
+  `voidReason?`, `requirementIds?`, `judgedAt`), and `failingRequirementIds[]`.
+
+Start a new generation whenever you begin a new build/capture/judge round. Never rewrite
+a past generation file -- if something about it turns out to be wrong, the correction
+belongs in the next generation's record, not a retroactive edit.
+
+## 8. Evidence discipline
+
+Captures are content-addressed evidence: real files this round produced, referenced by
+path in `lanes[].evidence[]`. A critic verdict without a citation to a capture file that
+exists on disk from this round is void, and the round repeats -- no exceptions, no
+"trust me." This applies to every lane, not just the visual ones: correctness cites
+test-run output, performance cites the histogram/measurement file, gameplay/behavioral
+cites the telemetry or replay capture that shows the described behavior.
+
+## 9. Loop discipline
+
+Build, capture, judge, fix the single biggest gap, repeat. Don't stop after a fixed
+number of rounds -- keep going until the human stops you. Periodically (roughly once per
+major wave of work) run one fresh pass over the whole project specifically looking for
+seams and inconsistencies between separately-improved pieces -- it fixes rough edges, it
+does not redesign.
+
+## 10. Session mechanics
+
+The wrapper alerts the human whenever you're waiting on them -- you don't need to do
+anything about that yourself. Keep `state.json`'s `statusNote` current; it's the human's
+at-a-glance view of where things stand between sessions.
