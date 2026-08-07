@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, extname } from 'node:path';
 import type { ImportScanResult, ImportCandidateMedia, ImportCandidateGoal, ImportCandidateGeneration } from '@gauntlet-wrapper/shared';
+import { readDerivedCatalogHints, normalizeSlashes } from './derivedCatalogHints.js';
 
 const PHOTO_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff']);
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v']);
@@ -44,6 +45,7 @@ async function scanMediaDir(projectPath: string, relDir: string, notes: string[]
       relativePath: relative(projectPath, absPath),
       filename: entry.name,
       sizeBytes: st.size,
+      suggestedNote: '',
     };
 
     if (PHOTO_EXTENSIONS.has(ext)) photos.push(candidate);
@@ -116,6 +118,26 @@ export async function scanForImportCandidates(projectPath: string): Promise<Impo
         allVideos.push(v);
       }
     }
+  }
+
+  const hints = await readDerivedCatalogHints(projectPath, MEDIA_CANDIDATE_DIRS);
+  let matchedHints = 0;
+  for (const p of allPhotos) {
+    const tags = hints.photoTagsBySourceFilename.get(p.filename);
+    if (tags) {
+      p.suggestedNote = tags;
+      matchedHints++;
+    }
+  }
+  for (const v of allVideos) {
+    const note = hints.videoNotesByRelativePath.get(normalizeSlashes(v.relativePath));
+    if (note) {
+      v.suggestedNote = note;
+      matchedHints++;
+    }
+  }
+  if (matchedHints > 0) {
+    notes.push(`Found a references/derived/catalog.json-style preprocessing catalog -- pulled in notes for ${matchedHints} file(s).`);
   }
 
   let photos = allPhotos;

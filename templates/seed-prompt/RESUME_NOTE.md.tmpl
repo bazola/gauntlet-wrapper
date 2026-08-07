@@ -5,8 +5,23 @@ need to repeat discovery or draft the binding-contract docs again.
 
 Current generation: {{CURRENT_GENERATION}}.
 
+**If this repo has an older, pre-wrapper `progress/` directory at repo root (e.g.
+`progress/state.json`, `progress/index.html`) -- that is superseded. Do not update it,
+even if your own past habit in this project was to.** Every round's summary belongs
+only under `.gauntlet/progress/`; the wrapper's Progress tab reads nothing else, so
+writing a round's summary anywhere else means it silently never shows up there at all.
+
 Before continuing the loop:
 
+0. Re-read this project's binding docs -- the architecture/feel/evidence-style bars from
+   your original kickoff's discovery, formalized in `.gauntlet/config.json`'s
+   `projectDocs` array so a fresh session doesn't have to rediscover them from scratch:
+
+{{PROJECT_DOCS_LIST}}
+
+   If that list is empty (an older project, onboarded before this field existed),
+   identify this project's binding docs now, re-read them, and populate `projectDocs`
+   before continuing -- don't proceed on memory of a conversation you're not actually in.
 1. Re-read `.gauntlet/config.json` -- `reviewerModel` may have changed since your last
    session; always use the live value when spawning critic subagents.
 2. Re-read `.gauntlet/references/catalog.json` -- new references may have been added,

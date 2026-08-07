@@ -72,8 +72,13 @@ export async function buildResumeNote(
 ): Promise<string> {
   void projectPath; // not needed yet, kept for signature symmetry with buildKickoffPrompt
   const template = await readFile(join(TEMPLATES_DIR, 'RESUME_NOTE.md.tmpl'), 'utf8');
+  const projectDocsList =
+    config.projectDocs.length > 0
+      ? config.projectDocs.map((f) => `   - ${f}`).join('\n')
+      : '   (none recorded)';
   return render(template, {
     PROJECT_DISPLAY_NAME: config.displayName,
     CURRENT_GENERATION: String(currentGeneration),
+    PROJECT_DOCS_LIST: projectDocsList,
   });
 }

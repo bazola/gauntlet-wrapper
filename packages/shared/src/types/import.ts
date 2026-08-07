@@ -10,6 +10,14 @@ export interface ImportCandidateMedia {
   relativePath: string;
   filename: string;
   sizeBytes: number;
+  /**
+   * Best-effort note pulled from a references/derived/catalog.json-shaped
+   * preprocessing catalog if one exists (content tags for stills, technical
+   * metadata + matched frame-strip descriptions for videos) -- empty string
+   * if nothing was found. Editable by the user before apply; whatever note
+   * text apply receives is written verbatim, not recomputed.
+   */
+  suggestedNote: string;
 }
 
 export interface ImportCandidateGoal {
@@ -35,9 +43,15 @@ export interface ImportScanResult {
   notes: string[];
 }
 
+export interface ImportApplyMediaSelection {
+  sourcePath: string;
+  /** Written verbatim as the reference's note -- caller decides the fallback if empty. */
+  note: string;
+}
+
 export interface ImportApplyRequest {
-  photoSourcePaths: string[];
-  videoSourcePaths: string[];
+  photos: ImportApplyMediaSelection[];
+  videos: ImportApplyMediaSelection[];
   importGoal: boolean;
   importGeneration: boolean;
 }

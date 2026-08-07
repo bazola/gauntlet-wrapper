@@ -18,6 +18,13 @@ export interface GauntletConfig {
   goalSummary: string;
   reviewerModel: string;
   projectType: ProjectType;
+  // Root-level binding docs Claude authored or discovered as this project's
+  // bars (an architecture contract, a feel spec, whatever the project calls
+  // for -- see KICKOFF S3). Formalized here, not left as tribal knowledge
+  // inside one long conversation, so a brand-new session (fresh context,
+  // reopened terminal) has an explicit, harness-tracked pointer back to
+  // exactly which files to re-read and keep honoring -- see RESUME_NOTE S0.
+  projectDocs: string[];
   perfHarness: {
     scaffolded: boolean;
     kind: PerfHarnessKind;

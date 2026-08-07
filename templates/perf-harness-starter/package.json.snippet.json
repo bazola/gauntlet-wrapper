@@ -1,0 +1,9 @@
+{
+  "_comment": "Merge these into this project's own package.json -- devDependencies and a perf script, not written automatically since it might collide with an existing script name.",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  },
+  "scripts": {
+    "perf": "node harness/run-perf.ts harness/perf.config.json"
+  }
+}

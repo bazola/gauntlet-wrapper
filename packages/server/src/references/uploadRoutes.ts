@@ -4,7 +4,15 @@ import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { getProject } from '../registry/registry.js';
-import { readCatalog, addPhotoReference, addVideoReference, addGameplayReference } from './referenceCatalog.js';
+import {
+  readCatalog,
+  addPhotoReference,
+  addVideoReference,
+  addGameplayReference,
+  removePhotoReference,
+  removeVideoReference,
+  removeGameplayReference,
+} from './referenceCatalog.js';
 import { asyncHandler } from '../api/asyncHandler.js';
 
 // Mounted at /api/projects/:id/references -- mergeParams so req.params.id
@@ -109,6 +117,29 @@ referencesRouter.post(
     }
     const entry = await addGameplayReference(project.path, goalText, String(gapText ?? ''), String(testIdeasText ?? ''));
     res.status(201).json(entry);
+  }),
+);
+
+referencesRouter.delete(
+  '/:kind/:refId',
+  asyncHandler(async (req, res) => {
+    const { kind, refId } = req.params;
+    if (kind !== 'photo' && kind !== 'video' && kind !== 'gameplay') {
+      res.status(400).json({ error: 'invalid kind' });
+      return;
+    }
+    const project = await getProject(projectIdParam(req));
+    if (!project) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    const removed =
+      kind === 'photo'
+        ? await removePhotoReference(project.path, refId)
+        : kind === 'video'
+          ? await removeVideoReference(project.path, refId)
+          : await removeGameplayReference(project.path, refId);
+    res.status(removed ? 204 : 404).end();
   }),
 );
 

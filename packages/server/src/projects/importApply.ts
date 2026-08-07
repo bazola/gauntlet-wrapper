@@ -25,28 +25,31 @@ async function getGitState(projectPath: string): Promise<{ sha: string | null; d
   }
 }
 
-async function importMediaFile(projectPath: string, kind: 'photo' | 'video', sourcePath: string): Promise<void> {
+async function importMediaFile(projectPath: string, kind: 'photo' | 'video', sourcePath: string, note: string): Promise<void> {
   const id = randomUUID();
   const filename = basename(sourcePath);
   const destDir = join(projectPath, '.gauntlet', 'references', kind, id);
   await mkdir(destDir, { recursive: true });
   await copyFile(sourcePath, join(destDir, filename));
 
-  const note = `Imported from ${filename}`;
-  if (kind === 'photo') await addPhotoReference(projectPath, id, filename, note);
-  else await addVideoReference(projectPath, id, filename, note);
+  // Whatever note text the client sent (the scan's suggested note, possibly
+  // user-edited) is written verbatim; only fall back to a generic note if it
+  // was left blank -- no tags/notes found, or the user cleared it on purpose.
+  const finalNote = note.trim().length > 0 ? note : `Imported from ${filename}`;
+  if (kind === 'photo') await addPhotoReference(projectPath, id, filename, finalNote);
+  else await addVideoReference(projectPath, id, filename, finalNote);
 }
 
 export async function applyImport(projectPath: string, request: ImportApplyRequest): Promise<ImportApplyResult> {
   let photosImported = 0;
   let videosImported = 0;
 
-  for (const sourcePath of request.photoSourcePaths) {
-    await importMediaFile(projectPath, 'photo', sourcePath);
+  for (const { sourcePath, note } of request.photos) {
+    await importMediaFile(projectPath, 'photo', sourcePath, note);
     photosImported++;
   }
-  for (const sourcePath of request.videoSourcePaths) {
-    await importMediaFile(projectPath, 'video', sourcePath);
+  for (const { sourcePath, note } of request.videos) {
+    await importMediaFile(projectPath, 'video', sourcePath, note);
     videosImported++;
   }
 

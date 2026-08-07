@@ -66,6 +66,7 @@ export async function onboardProject(
     goalSummary: '',
     reviewerModel: globalDefaultReviewerModel,
     projectType: 'other',
+    projectDocs: [],
     perfHarness: { scaffolded: false, kind: 'none', entryScript: null },
     visualFidelity: { enabled: false, splitSubLanes: false },
     temporalFidelity: { enabled: false },

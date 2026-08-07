@@ -1,0 +1,11 @@
+{
+  "url": "http://127.0.0.1:4173/",
+  "warmupMs": 3000,
+  "durationMs": 15000,
+  "heapSoakMs": 30000,
+  "budgets": {
+    "p99Ms": 16.6,
+    "maxMs": 50,
+    "heapGrowthMbPerMin": 1
+  }
+}

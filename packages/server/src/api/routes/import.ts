@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ImportApplyRequest } from '@gauntlet-wrapper/shared';
+import type { ImportApplyRequest, ImportApplyMediaSelection } from '@gauntlet-wrapper/shared';
 import { getProject } from '../../registry/registry.js';
 import { scanForImportCandidates } from '../../projects/importScanner.js';
 import { applyImport } from '../../projects/importApply.js';
@@ -34,9 +34,17 @@ importRouter.post(
     }
 
     const body = req.body ?? {};
+    const parseSelections = (value: unknown): ImportApplyMediaSelection[] => {
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter((v): v is Record<string, unknown> => v !== null && typeof v === 'object')
+        .filter((v) => typeof v.sourcePath === 'string')
+        .map((v) => ({ sourcePath: v.sourcePath as string, note: typeof v.note === 'string' ? v.note : '' }));
+    };
+
     const request: ImportApplyRequest = {
-      photoSourcePaths: Array.isArray(body.photoSourcePaths) ? body.photoSourcePaths.filter((p: unknown) => typeof p === 'string') : [],
-      videoSourcePaths: Array.isArray(body.videoSourcePaths) ? body.videoSourcePaths.filter((p: unknown) => typeof p === 'string') : [],
+      photos: parseSelections(body.photos),
+      videos: parseSelections(body.videos),
       importGoal: body.importGoal === true,
       importGeneration: body.importGeneration === true,
     };

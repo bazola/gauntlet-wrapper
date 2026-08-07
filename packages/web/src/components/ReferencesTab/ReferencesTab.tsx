@@ -31,7 +31,7 @@ export function ReferencesTab({ projectId }: ReferencesTabProps) {
         <VideoReferenceForm projectId={projectId} onAdded={refresh} />
         <GameplayReferenceForm projectId={projectId} onAdded={refresh} />
       </div>
-      <ReferenceList projectId={projectId} catalog={catalog} />
+      <ReferenceList projectId={projectId} catalog={catalog} onChanged={refresh} />
     </div>
   );
 }

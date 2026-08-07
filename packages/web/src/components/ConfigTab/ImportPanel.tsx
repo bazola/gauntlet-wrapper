@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ImportScanResult, ImportApplyResult } from '@gauntlet-wrapper/shared';
+import type { ImportScanResult, ImportApplyResult, ImportCandidateMedia } from '@gauntlet-wrapper/shared';
 
 interface ImportPanelProps {
   projectId: string;
@@ -11,6 +11,9 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// sourcePath -> note text. Presence as a key = selected for import.
+type SelectionMap = Map<string, string>;
+
 export function ImportPanel({ projectId }: ImportPanelProps) {
   const [scan, setScan] = useState<ImportScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -18,8 +21,8 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportApplyResult | null>(null);
 
-  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
-  const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [selectedPhotos, setSelectedPhotos] = useState<SelectionMap>(new Map());
+  const [selectedVideos, setSelectedVideos] = useState<SelectionMap>(new Map());
   const [importGoal, setImportGoal] = useState(true);
   const [importGeneration, setImportGeneration] = useState(true);
 
@@ -33,8 +36,8 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       const data = body as ImportScanResult;
       setScan(data);
-      setSelectedPhotos(new Set(data.photos.map((p) => p.sourcePath)));
-      setSelectedVideos(new Set(data.videos.map((v) => v.sourcePath)));
+      setSelectedPhotos(new Map(data.photos.map((p) => [p.sourcePath, p.suggestedNote])));
+      setSelectedVideos(new Map(data.videos.map((v) => [v.sourcePath, v.suggestedNote])));
       setImportGoal(data.goal !== null);
       setImportGeneration(data.generation !== null);
     } catch (err) {
@@ -44,11 +47,17 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
     }
   };
 
-  const toggle = (set: Set<string>, setSet: (s: Set<string>) => void, key: string) => {
-    const next = new Set(set);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    setSet(next);
+  const toggle = (map: SelectionMap, setMap: (m: SelectionMap) => void, item: ImportCandidateMedia) => {
+    const next = new Map(map);
+    if (next.has(item.sourcePath)) next.delete(item.sourcePath);
+    else next.set(item.sourcePath, item.suggestedNote);
+    setMap(next);
+  };
+
+  const setNote = (map: SelectionMap, setMap: (m: SelectionMap) => void, sourcePath: string, note: string) => {
+    const next = new Map(map);
+    next.set(sourcePath, note);
+    setMap(next);
   };
 
   const apply = async () => {
@@ -60,8 +69,8 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          photoSourcePaths: [...selectedPhotos],
-          videoSourcePaths: [...selectedVideos],
+          photos: [...selectedPhotos].map(([sourcePath, note]) => ({ sourcePath, note })),
+          videos: [...selectedVideos].map(([sourcePath, note]) => ({ sourcePath, note })),
           importGoal: importGoal && scan.goal !== null,
           importGeneration: importGeneration && scan.generation !== null,
         }),
@@ -77,6 +86,31 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
     }
   };
 
+  const renderMediaList = (items: ImportCandidateMedia[], map: SelectionMap, setMap: (m: SelectionMap) => void) => (
+    <div style={{ maxHeight: '220px', overflowY: 'auto', fontSize: '0.8rem' }}>
+      {items.map((item) => {
+        const selected = map.has(item.sourcePath);
+        return (
+          <div key={item.sourcePath} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0' }}>
+            <input type="checkbox" checked={selected} onChange={() => toggle(map, setMap, item)} />
+            <span style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+              {item.relativePath} <span style={{ color: '#888' }}>({formatBytes(item.sizeBytes)})</span>
+            </span>
+            <input
+              type="text"
+              placeholder="note"
+              value={map.get(item.sourcePath) ?? ''}
+              disabled={!selected}
+              onChange={(e) => setNote(map, setMap, item.sourcePath, e.target.value)}
+              style={{ flex: 1, padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
+            />
+          </div>
+        );
+      })}
+      {items.length === 0 && <p style={{ color: '#888' }}>None found.</p>}
+    </div>
+  );
+
   return (
     <div style={{ border: '1px solid #333', borderRadius: '4px', padding: '0.75rem', background: '#1b1e24' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -86,8 +120,9 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
         </button>
       </div>
       <p style={{ fontSize: '0.8rem', color: '#888', margin: '0.4rem 0 0' }}>
-        Looks for reference images/video, a goal/kickoff doc, and existing progress data already in this repo. Nothing is
-        written until you review the results below and click Import.
+        Looks for reference images/video, a goal/kickoff doc, and existing progress data already in this repo -- including a
+        references/derived/catalog.json-style preprocessing catalog, if one exists, for per-file tags and notes. Nothing is
+        written until you review (and can edit) the results below and click Import.
       </p>
 
       {error && <p style={{ color: '#e88' }}>{error}</p>}
@@ -112,36 +147,12 @@ export function ImportPanel({ projectId }: ImportPanelProps) {
 
           <div>
             <strong style={{ fontSize: '0.85rem' }}>Photos ({scan.photos.length})</strong>
-            <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.8rem' }}>
-              {scan.photos.map((p) => (
-                <label key={p.sourcePath} style={{ display: 'block', padding: '0.15rem 0' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedPhotos.has(p.sourcePath)}
-                    onChange={() => toggle(selectedPhotos, setSelectedPhotos, p.sourcePath)}
-                  />{' '}
-                  {p.relativePath} <span style={{ color: '#888' }}>({formatBytes(p.sizeBytes)})</span>
-                </label>
-              ))}
-              {scan.photos.length === 0 && <p style={{ color: '#888' }}>None found.</p>}
-            </div>
+            {renderMediaList(scan.photos, selectedPhotos, setSelectedPhotos)}
           </div>
 
           <div>
             <strong style={{ fontSize: '0.85rem' }}>Videos ({scan.videos.length})</strong>
-            <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.8rem' }}>
-              {scan.videos.map((v) => (
-                <label key={v.sourcePath} style={{ display: 'block', padding: '0.15rem 0' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedVideos.has(v.sourcePath)}
-                    onChange={() => toggle(selectedVideos, setSelectedVideos, v.sourcePath)}
-                  />{' '}
-                  {v.relativePath} <span style={{ color: '#888' }}>({formatBytes(v.sizeBytes)})</span>
-                </label>
-              ))}
-              {scan.videos.length === 0 && <p style={{ color: '#888' }}>None found.</p>}
-            </div>
+            {renderMediaList(scan.videos, selectedVideos, setSelectedVideos)}
           </div>
 
           <div>

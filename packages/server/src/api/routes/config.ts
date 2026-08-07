@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getProject } from '../../registry/registry.js';
-import { readConfig, setReviewerModel, setGoalSummary } from '../../projects/configStore.js';
+import { readConfig, setReviewerModel, setGoalSummary, setProjectDocs } from '../../projects/configStore.js';
 import { readGoal, writeGoal } from '../../projects/goal.js';
 import { asyncHandler } from '../asyncHandler.js';
 
@@ -37,6 +37,23 @@ configRouter.put(
       return;
     }
     res.json(await setReviewerModel(project.path, reviewerModel.trim()));
+  }),
+);
+
+configRouter.put(
+  '/project-docs',
+  asyncHandler(async (req, res) => {
+    const project = await getProject(projectIdParam(req));
+    if (!project) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    const { projectDocs } = req.body ?? {};
+    if (!Array.isArray(projectDocs) || !projectDocs.every((f: unknown) => typeof f === 'string')) {
+      res.status(400).json({ error: 'projectDocs must be an array of strings' });
+      return;
+    }
+    res.json(await setProjectDocs(project.path, projectDocs));
   }),
 );
 

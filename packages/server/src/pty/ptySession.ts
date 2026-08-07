@@ -19,6 +19,13 @@ const IDLE_MS = 1200;
 const BRACKETED_PASTE_START = '\x1b[200~';
 const BRACKETED_PASTE_END = '\x1b[201~';
 
+// Every session the wrapper launches runs unattended and is meant to keep
+// looping without a human sitting at the keyboard approving each tool call --
+// per explicit user instruction, permission prompts are always skipped. This
+// is the one place that decision lives; there is deliberately no per-project
+// or UI toggle for it.
+const CLAUDE_LAUNCH_COMMAND = 'claude --dangerously-skip-permissions\r';
+
 export type PtyDataListener = (data: string) => void;
 export type PtyExitListener = (info: { exitCode: number; signal?: number }) => void;
 
@@ -66,7 +73,7 @@ export class PtySession {
         this.claudeLaunched = true;
         // Fire on the first output chunk (the shell's banner/prompt), which is
         // proof the pty is actually ready to receive input.
-        this.ptyProcess.write('claude\r');
+        this.ptyProcess.write(CLAUDE_LAUNCH_COMMAND);
       }
       this.armIdleWatch();
     });

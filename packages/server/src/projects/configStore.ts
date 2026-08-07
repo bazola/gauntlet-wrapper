@@ -48,3 +48,19 @@ export async function setNotificationHookStatus(projectPath: string, target: Hoo
     updatedAt: new Date().toISOString(),
   });
 }
+
+export async function setProjectDocs(projectPath: string, projectDocs: string[]): Promise<GauntletConfig> {
+  const current = await readConfig(projectPath);
+  const next: GauntletConfig = { ...current, projectDocs, updatedAt: new Date().toISOString() };
+  await writeConfig(projectPath, next);
+  return next;
+}
+
+export async function markPerfHarnessScaffolded(projectPath: string): Promise<void> {
+  const current = await readConfig(projectPath);
+  await writeConfig(projectPath, {
+    ...current,
+    perfHarness: { scaffolded: true, kind: 'playwright-frame-based', entryScript: 'npm run perf' },
+    updatedAt: new Date().toISOString(),
+  });
+}

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ReferencesCatalog, PhotoReference, VideoReference, GameplayReference } from '@gauntlet-wrapper/shared';
 import { readCurrentGeneration as currentGeneration } from '../progress/currentGeneration.js';
@@ -100,4 +100,37 @@ export async function addGameplayReference(
 // catalog entry we write afterward agree on the same folder name.
 export function newReferenceId(): string {
   return randomUUID();
+}
+
+export async function removePhotoReference(projectPath: string, id: string): Promise<boolean> {
+  const catalog = await readCatalog(projectPath);
+  const idx = catalog.photo.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  catalog.photo.splice(idx, 1);
+  await writeCatalog(projectPath, catalog);
+  await rm(join(projectPath, '.gauntlet', 'references', 'photo', id), { recursive: true, force: true });
+  return true;
+}
+
+export async function removeVideoReference(projectPath: string, id: string): Promise<boolean> {
+  const catalog = await readCatalog(projectPath);
+  const idx = catalog.video.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  catalog.video.splice(idx, 1);
+  await writeCatalog(projectPath, catalog);
+  await rm(join(projectPath, '.gauntlet', 'references', 'video', id), { recursive: true, force: true });
+  return true;
+}
+
+export async function removeGameplayReference(projectPath: string, id: string): Promise<boolean> {
+  const catalog = await readCatalog(projectPath);
+  const idx = catalog.gameplay.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  // No files on disk for a gameplay reference -- catalog entry is all there is.
+  // NB: if it was already formalized (derivedRequirementIds non-empty), the
+  // requirements it produced are left standing -- there's no formalization
+  // pipeline yet to know whether retiring them is safe.
+  catalog.gameplay.splice(idx, 1);
+  await writeCatalog(projectPath, catalog);
+  return true;
 }
