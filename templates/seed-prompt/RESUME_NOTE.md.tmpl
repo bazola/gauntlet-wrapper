@@ -24,8 +24,14 @@ Before continuing the loop:
    before continuing -- don't proceed on memory of a conversation you're not actually in.
 1. Re-read `.gauntlet/config.json` -- `reviewerModel` may have changed since your last
    session; always use the live value when spawning critic subagents.
-2. Re-read `.gauntlet/references/catalog.json` -- new references may have been added,
-   including gameplay references awaiting formalization (`status: "raw"`).
+2. Re-read `.gauntlet/references/catalog.json` -- new references may have been added.
+   **If any `gameplay[]` entry has `status: "raw"`, formalize it now, before doing
+   anything else** -- same process as your original kickoff's S4 (draft testing
+   requirement(s) into `.gauntlet/progress/requirements.json`, then set the source
+   reference's `status: "formalized"`, `formalizedAt`, and `derivedRequirementIds`).
+   This is what makes the requirement show up in the wrapper's References tab as
+   something the human can see is now actually being tested -- an entry left `raw`
+   stays invisible to the loop and to them.
 3. Re-read `.gauntlet/goal.md` -- it may have been edited.
 
 Then continue the gauntlet loop: build, capture, judge, fix the single biggest gap,

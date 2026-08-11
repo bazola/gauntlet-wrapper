@@ -2,7 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import type { WsClientEnvelope, WsServerEnvelope } from '@gauntlet-wrapper/shared';
 import { getProject } from '../registry/registry.js';
-import { getOrCreateSession, getSession } from '../pty/ptyRegistry.js';
+import { getSession } from '../pty/ptyRegistry.js';
 import { subscribeProgress, getProgressSnapshot } from '../progress/progressWatcherRegistry.js';
 import { subscribeNotifications, getPendingNotification, clearNotification } from '../hooks/notificationState.js';
 
@@ -44,7 +44,15 @@ export function attachWsServer(httpServer: HttpServer): WebSocketServer {
           }
           unsubscribers.get(key)?.(); // idempotent re-subscribe
 
-          const session = getOrCreateSession(project.id, project.path);
+          // Subscribing never starts a session -- only POST .../terminal/start
+          // does (see api/routes/terminal.ts). Re-sent by the frontend right
+          // after a successful start call, at which point this finds the
+          // now-real session and attaches normally.
+          const session = getSession(project.id);
+          if (!session) {
+            send(socket, { channel: 'terminal', project: project.id, type: 'not-started' });
+            return;
+          }
           send(socket, { channel: 'terminal', project: project.id, type: 'scrollback', payload: session.getScrollback() });
 
           const offData = session.onData((data) => {

@@ -7,6 +7,9 @@ import { notificationsAckRouter } from './api/routes/notifications.js';
 import { filesystemRouter } from './api/routes/filesystem.js';
 import { importRouter } from './api/routes/import.js';
 import { perfRouter } from './api/routes/perf.js';
+import { evidenceRouter } from './api/routes/evidence.js';
+import { terminalRouter } from './api/routes/terminal.js';
+import { requirementsRouter } from './api/routes/requirements.js';
 import { referencesRouter } from './references/uploadRoutes.js';
 import { notificationHookRouter } from './hooks/notificationRoute.js';
 import { ensureHookScriptInstalled } from './hooks/installHookScript.js';
@@ -30,6 +33,9 @@ app.use('/api/projects/:id/references', referencesRouter);
 app.use('/api/projects/:id/notifications', notificationsAckRouter);
 app.use('/api/projects/:id/import', importRouter);
 app.use('/api/projects/:id/perf', perfRouter);
+app.use('/api/projects/:id/evidence', evidenceRouter);
+app.use('/api/projects/:id/terminal', terminalRouter);
+app.use('/api/projects/:id/requirements', requirementsRouter);
 app.use('/api/hooks/notification', notificationHookRouter);
 
 // Last middleware: every route handler is wrapped with asyncHandler (see

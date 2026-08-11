@@ -9,6 +9,11 @@ import { buildKickoffPrompt, buildResumeNote } from '../seedPrompt/buildSeedProm
 // concurrency (this already IS that map, just driven by one browser tab today).
 const sessions = new Map<string, PtySession>();
 
+// Only ever called from POST /api/projects/:id/terminal/start (see
+// api/routes/terminal.ts) -- an explicit human action, never implicitly from
+// a websocket subscribe. Merely viewing the Session tab must not spawn a PTY
+// or start delivering the kickoff/resume prompt; the user gets to look
+// around and edit things first.
 export function getOrCreateSession(projectId: string, cwd: string): PtySession {
   const existing = sessions.get(projectId);
   if (existing && existing.isAlive()) return existing;

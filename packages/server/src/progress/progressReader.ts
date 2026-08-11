@@ -33,10 +33,27 @@ async function readJsonSafe<T>(path: string, schema: z.ZodType<T>, errors: strin
 
   const result = schema.safeParse(parsed);
   if (!result.success) {
-    errors.push(`${label}: schema validation failed (${result.error.issues.map((i) => i.message).join('; ')})`);
+    // Zod's own issue.message is often just "Required" with no field name --
+    // the path is where the actually useful information lives, so it's
+    // prepended here rather than left for the reader to guess at.
+    const detail = result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+    errors.push(`${label}: schema validation failed (${detail})`);
     return null;
   }
   return result.data;
+}
+
+// Standalone so callers that only need the standing requirement set (e.g. the
+// References tab cross-referencing a gameplay reference's derivedRequirementIds)
+// don't have to pull in generations/state through the full snapshot.
+export async function readRequirementsFile(projectPath: string): Promise<RequirementsFile | null> {
+  const errors: string[] = [];
+  return readJsonSafe(
+    join(projectPath, '.gauntlet', 'progress', 'requirements.json'),
+    RequirementsFileSchema,
+    errors,
+    'requirements.json',
+  );
 }
 
 export async function readProgressSnapshot(projectPath: string): Promise<ProgressSnapshot> {

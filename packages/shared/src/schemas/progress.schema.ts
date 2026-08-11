@@ -1,31 +1,46 @@
 import { z } from 'zod';
 
-export const LaneIdSchema = z.enum([
-  'performance',
-  'correctness',
-  'visual-fidelity',
-  'visual-fidelity/materials-lighting-post',
-  'visual-fidelity/geometry-silhouette',
-  'temporal-fidelity',
-  'gameplay-fidelity',
-]);
+// Deliberately a free-form string, not a fixed enum. Real projects keep their
+// own long-established lane names (a mature project's critic lanes predate
+// the wrapper and won't match a generic taxonomy exactly), and the wrapper's
+// job is to render whatever's reported, not gatekeep specific identifiers --
+// the only thing actually enforced is that a performance-shaped and a
+// correctness-shaped lane get reported every round (see KICKOFF S5).
+export const LaneIdSchema = z.string().min(1);
 export type LaneId = z.infer<typeof LaneIdSchema>;
 
 export const LaneVerdictSchema = z.object({
-  lane: LaneIdSchema,
-  winner: z.enum(['ours', 'reference', 'n/a']),
+  id: LaneIdSchema,
+  // Conventionally 'ours' | 'reference' | 'n/a', but real verdicts are
+  // routinely nuanced -- partial wins per sub-aspect, "mixed", a carried-
+  // forward "n/a (not this round's target)". Free text on purpose; a verdict
+  // that has to be forced into three buckets loses exactly the nuance a
+  // critic was trying to report.
+  winner: z.string().min(1),
   biggestGap: z.string(),
   evidence: z.array(z.string()),
-  void: z.boolean(),
+  // Bookkeeping fields Claude reasonably omits when they're implied (a lane
+  // with real evidence + a gap description isn't void; the record's own
+  // createdAt is a fine stand-in for exactly when it was judged) -- optional
+  // rather than a validation failure over missing ceremony.
+  void: z.boolean().optional(),
   voidReason: z.string().optional(),
   requirementIds: z.array(z.string()).optional(),
-  judgedAt: z.string(),
+  judgedAt: z.string().optional(),
+  // Which round/sub-round this specific finding was actually judged in, when
+  // it differs from the generation record's own label -- e.g. a finding
+  // carried forward unchanged from an earlier round.
+  round: z.string().optional(),
 });
 export type LaneVerdict = z.infer<typeof LaneVerdictSchema>;
 
 export const PerformanceGateSchema = z.object({
   evaluated: z.boolean(),
-  pass: z.boolean(),
+  // Nullable, not just boolean: when `evaluated` is false (round reverted
+  // before shipping, harness didn't run, etc.) there is no pass/fail verdict
+  // to report -- `null` is the honest value, forcing a boolean would mean
+  // picking one that isn't true.
+  pass: z.boolean().nullable(),
   evidence: z.array(z.string()),
   reason: z.string().optional(),
 });

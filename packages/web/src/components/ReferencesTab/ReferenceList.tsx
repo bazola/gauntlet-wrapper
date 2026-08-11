@@ -1,11 +1,20 @@
 import { useState, type CSSProperties } from 'react';
-import type { ReferencesCatalog } from '@gauntlet-wrapper/shared';
+import type { ReferencesCatalog, RequirementsFile } from '@gauntlet-wrapper/shared';
 
 interface ReferenceListProps {
   projectId: string;
   catalog: ReferencesCatalog | null;
+  requirements: RequirementsFile | null;
   onChanged: () => void;
 }
+
+const requirementCardStyle: CSSProperties = {
+  border: '1px solid #2a2d34',
+  borderRadius: '4px',
+  padding: '0.4rem 0.6rem',
+  marginTop: '0.3rem',
+  background: '#14161a',
+};
 
 const cardStyle: CSSProperties = {
   border: '1px solid #333',
@@ -28,10 +37,12 @@ const deleteButtonStyle: CSSProperties = {
   cursor: 'pointer',
 };
 
-export function ReferenceList({ projectId, catalog, onChanged }: ReferenceListProps) {
+export function ReferenceList({ projectId, catalog, requirements, onChanged }: ReferenceListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!catalog) return <p>Loading references...</p>;
+
+  const requirementById = new Map((requirements?.requirements ?? []).map((r) => [r.id, r]));
 
   const fileUrl = (kind: 'photo' | 'video', refId: string, filename: string) =>
     `/api/projects/${projectId}/references/file/${kind}/${refId}/${encodeURIComponent(filename)}`;
@@ -126,9 +137,33 @@ export function ReferenceList({ projectId, catalog, onChanged }: ReferenceListPr
                 <p style={{ fontSize: '0.85rem', margin: '0.3rem 0', color: '#aaa' }}>Test ideas: {ref.testIdeasText}</p>
               )}
               {ref.derivedRequirementIds.length > 0 && (
-                <p style={{ fontSize: '0.8rem', margin: '0.3rem 0', color: '#8cf' }}>
-                  Requirements: {ref.derivedRequirementIds.join(', ')}
-                </p>
+                <div style={{ margin: '0.3rem 0' }}>
+                  <p style={{ fontSize: '0.75rem', margin: '0 0 0.2rem', color: '#8cf' }}>Tested by:</p>
+                  {ref.derivedRequirementIds.map((reqId) => {
+                    const req = requirementById.get(reqId);
+                    if (!req) {
+                      // Formalized but the requirement wasn't found (retired, or
+                      // requirements.json hasn't been written yet) -- fall back to
+                      // the bare id rather than silently dropping the reference.
+                      return (
+                        <p key={reqId} style={{ fontSize: '0.8rem', margin: '0.2rem 0', color: '#888' }}>
+                          {reqId} <em>(not found in requirements.json)</em>
+                        </p>
+                      );
+                    }
+                    return (
+                      <div key={reqId} style={requirementCardStyle}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <strong style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem' }}>{req.id}</strong>
+                          <span style={{ fontSize: '0.7rem', color: '#888' }}>{req.status}</span>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>{req.assertion}</p>
+                        <p style={{ fontSize: '0.75rem', color: '#aaa', margin: '0.15rem 0' }}>Measured by: {req.measurement}</p>
+                        <p style={{ fontSize: '0.75rem', color: '#aaa', margin: '0.15rem 0' }}>Pass criteria: {req.passCriteria}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           ))}

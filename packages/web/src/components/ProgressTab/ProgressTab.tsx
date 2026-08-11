@@ -60,7 +60,7 @@ export function ProgressTab({ projectId }: ProgressTabProps) {
         <h3>Generations ({generations.length})</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {sortedDesc.map((gen) => (
-            <GenerationView key={gen.generation} generation={gen} />
+            <GenerationView key={gen.generation} projectId={projectId} generation={gen} />
           ))}
           {generations.length === 0 && <p style={{ color: '#888' }}>No generations recorded yet.</p>}
         </div>

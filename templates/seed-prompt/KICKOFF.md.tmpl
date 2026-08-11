@@ -62,14 +62,26 @@ The human adds reference material through the wrapper's References tab. It lands
 new raw gameplay reference appears: read every `gameplay[]` entry with
 `status: "raw"`, and for each one, draft one or more formal, ID'd testing requirements
 into `.gauntlet/progress/requirements.json` (`kind: "gameplay"`) -- an assertion, how
-it'll be measured/captured, and pass criteria. Then mark the source reference
+it'll be measured/captured, and pass criteria. A gameplay entry is free text with no
+file of its own, but the `photo[]`/`video[]` entries sitting alongside it in the same
+catalog are fair game as supporting evidence -- e.g. a screenshot added around the same
+time, or one whose `note` mentions the same feature, can sharpen a vague `goalText`/
+`gapText` into a concrete, checkable `measurement`. Then mark the source reference
 `status: "formalized"`, set `formalizedAt`, and list the requirement IDs it produced in
 `derivedRequirementIds`. Once formalized, a requirement is **standing** -- checked every
-round from then on, the same way every other requirement is.
+round from then on, the same way every other requirement is, and the wrapper's
+References tab renders it under the source entry so the human can see exactly what
+it's now being tested against.
 
 ## 5. Reviewer taxonomy
 
-Two lanes are standing -- active every round, for every project, no matter what
+The names below are categories, not literal identifiers you have to use verbatim --
+`lanes[].id` (S7) is free text. If this project already has its own established lane
+names (from before it was on the wrapper, or just your own preference), keep using
+them; nothing here enforces specific id strings. What's enforced is that a
+performance-shaped and a correctness-shaped lane both get reported every round.
+
+Four lanes are standing -- active every round, for every project, no matter what
 references exist:
 
 - **Performance** -- see S6. This lane gates the round: if this round's performance
@@ -80,9 +92,25 @@ references exist:
 - **Correctness** -- your deterministic test suite, plus any invariant/solver-style
   checks appropriate to the project, plus the mechanically-checkable pieces of
   formalized gameplay requirements (`kind: "correctness"` requirements land here too).
+- **Code Health** -- a fresh-eyes pass over this round's diff (and, periodically, the
+  wider codebase per S9) for architecture drift, dead code, duplicated logic, unmanaged
+  dependencies, and lint/type-check strictness. Distinct from Correctness: a change can
+  pass every test and still be a maintainability regression (a God-object growing
+  another responsibility, copy-pasted logic that should've been shared, a lint
+  suppression added instead of a fix) -- this lane is the one that's allowed to say so.
+  Evidence is this round's lint/type-check/dependency-audit output, or a findings note
+  the critic writes to disk citing specific `file:line` locations -- an impression with
+  no citation is void, same as any other lane.
+- **Stability/Soak** -- hunts for what a single happy-path run won't surface: for
+  interactive/long-running projects, an extended play or idle session watching for
+  crashes, memory growth beyond what the Performance lane already samples, unhandled
+  promise rejections, and console/stderr errors; for a CLI or library, repeated and
+  fuzzed invocation (malformed input, concurrent calls, resource exhaustion) checking
+  for clean failure and no leaked handles/state. Evidence is this round's soak/fuzz log
+  or crash report, even when the result is "ran N minutes/iterations, nothing to
+  report."
 
-Three lanes are conditional -- active only once the matching reference stream has at
-least one entry:
+Six lanes are conditional -- active only once their trigger condition is met:
 
 - **Visual Fidelity** (active once `references.photo` is non-empty) -- blind A/B, ours
   vs. reference, unlabeled and in randomized order until the critic has picked a winner
@@ -90,6 +118,18 @@ least one entry:
   and `visual-fidelity/geometry-silhouette` sub-lanes if the project has enough visual
   surface for mesh/shading detail to otherwise dominate every verdict; otherwise run it
   as one lane.
+- **Visual Fidelity -- Adversarial Pass** (active whenever Visual Fidelity is active) --
+  a second, stricter critic over the *same* round's blind-A/B pair, run as a genuinely
+  separate subagent from the standard Visual Fidelity critic (different context, does
+  not see the other's verdict first). Its prior is that the reference wins by default;
+  calling the build even ("ours" or a tie) requires actively hunting across at least
+  silhouette/edges, material response under the round's specific lighting, color
+  grading, and texel/aliasing density, and stating what was checked in each category and
+  why it held up -- not just an overall impression. When this lane and the standard
+  Visual Fidelity lane disagree, trust this one and treat the standard lane's win as
+  provisional; the point of running both is that the standard lane alone has a history
+  of false positives (a resemblance read as a match on a quick look) that only a critic
+  actively trying to find fault catches. Prefer void-and-repeat over a borderline pass.
 - **Temporal/Motion Fidelity** (active once `references.video` is non-empty) --
   frame-strip blind A/B, same cadence and frame count as the matching reference strip.
 - **Gameplay/Behavioral Fidelity** (active once at least one `references.gameplay` entry
@@ -97,6 +137,20 @@ least one entry:
   capture strips of the specific described behavior) against the formalized
   requirements. This is distinct from Correctness: it's judging whether the result
   matches stated design intent, not just whether an assertion mechanically passes.
+- **Game Feel** (active whenever Gameplay/Behavioral Fidelity is active) -- judges the
+  *dynamics* of interaction that Gameplay/Behavioral Fidelity's pass/fail requirements
+  don't capture on their own: hit-stop and impact feedback, screen shake/juice,
+  input-buffering and responsiveness latency, animation anticipation/follow-through.
+  Two builds can satisfy the same formalized requirement while one feels inert and the
+  other feels responsive -- this lane is what's allowed to name that gap. Evidence is a
+  capture strip or telemetry of input-to-response timing, same discipline as any other
+  lane.
+- **Accessibility** (active for `browser-canvas`/`browser-webgpu` projects, and any
+  other project type with a user-facing interactive UI, e.g. a TUI -- skip for a pure
+  library or headless backend-service with no UI surface) -- color contrast, whether
+  controls are remappable, on-screen text legible at the target resolution, and
+  reasonable difficulty/pacing accommodations. Evidence is a capture or contrast-ratio
+  measurement from this round, not a description of intent.
 
 Cross-cutting rules, all lanes:
 
@@ -106,15 +160,19 @@ Cross-cutting rules, all lanes:
   bar, and this round's evidence only. Never the builder's reasoning, diffs, or excuses.
   Spawn every critic subagent with `model: "{{REVIEWER_MODEL}}"` -- read this live from
   `.gauntlet/config.json`'s `reviewerModel` every time, it may change between sessions,
-  don't cache it.
-- **Divergence rule** (Visual and Gameplay/Behavioral lanes only). Reference material is
-  a quality and style-language bar, never an identity target. Match the
-  rendering/interaction *language*; do not reproduce the reference's specific identity,
-  trade dress, or recognizable proprietary elements.
+  don't cache it. This applies to the Visual Fidelity Adversarial Pass too: it must be
+  its own subagent, not the standard Visual Fidelity critic asked to double-check itself.
+- **Divergence rule** (Visual, Visual Adversarial, Gameplay/Behavioral, and Game Feel
+  lanes). Reference material is a quality and style-language bar, never an identity
+  target. Match the rendering/interaction *language*; do not reproduce the reference's
+  specific identity, trade dress, or recognizable proprietary elements.
 - **One gap per lane per round.** A critic's verdict names the single biggest remaining
   gap. The builder fixes that, not a laundry list.
-- **Blind A/B** (Visual and Temporal lanes). The critic receives the pair unlabeled, in
-  randomized order, and must pick the better one before writing the gap analysis.
+- **Blind A/B** (Visual, Visual Adversarial, and Temporal lanes). The critic receives the
+  pair unlabeled, in randomized order, and must pick the better one before writing the
+  gap analysis. The Adversarial Pass may reuse the same capture pair the standard Visual
+  Fidelity lane used this round rather than requiring a fresh capture, but still receives
+  it unlabeled and independently randomized.
 
 ## 6. Performance lane mechanics
 
@@ -151,18 +209,35 @@ wrapper's Progress tab. Files:
 
 - `state.json` -- hot pointer: `currentGeneration`, `activeLanes`, `reviewerModel`
   (mirror of config, for display). Update this whenever the round advances.
-- `requirements.json` -- the standing requirement set
-  (`kind: "gameplay" | "correctness"`), each with `id`, `assertion`, `measurement`,
-  `passCriteria`, `status`, `createdAtGeneration`, and `sourceReferenceId` for
-  gameplay-derived ones.
+- `requirements.json` -- the standing requirement set. Each entry needs exactly these
+  fields (extra fields of your own are fine and preserved, but these are the ones the
+  wrapper's schema validates and its UI renders -- get the names and types right or the
+  whole file fails validation and the Progress tab shows a parse error instead of your
+  data): `id` (string), `kind` (`"gameplay" | "correctness"`), `assertion` (string --
+  what must hold), `measurement` (string -- how it's checked), `passCriteria` (string --
+  when it counts as passing; fold a multi-part checklist into one string, e.g.
+  numbered inline, rather than an array), `status` (`"active" | "retired"` -- **not**
+  a pass/fail or resolved/open tracker: `active` means "still a standing check", full
+  stop. Whether it's *currently passing* is a per-round fact, not a property of the
+  requirement -- it's `active` for its entire life unless you deliberately retire it as
+  no-longer-relevant), `createdAt` (ISO string) and `createdAtGeneration` (number), and
+  `sourceReferenceId` for gameplay-derived ones. Current pass/fail for a given round
+  belongs in that round's own `generations/gen-NNNN.json` (`failingRequirementIds[]` --
+  present means failing that round, absent means it passed), never on the requirement
+  record itself.
 - `generations/gen-NNNN.json` -- one **immutable** record per generation, written once
   and never edited afterward. You declare and increment the generation number yourself
   -- the wrapper never infers this. Each record needs: `generation`, `label`,
   `createdAt`, `gitSha`/`gitDirty` (record the actual state of the repo, `gitSha: null`
   if the worktree is dirty), `statusNote` (a human-readable one-paragraph summary --
   this is what the human reads at a glance), `performanceGate`, `lanes[]` (one
-  `LaneVerdict` per active lane: `lane`, `winner`, `biggestGap`, `evidence[]`, `void`,
-  `voidReason?`, `requirementIds?`, `judgedAt`), and `failingRequirementIds[]`.
+  `LaneVerdict` per active lane: `id` (free text -- your own lane naming convention is
+  fine, nothing enforces specific identifiers), `winner` (free text too -- `ours` /
+  `reference` / `n/a` are the convention, but a nuanced or partial verdict is normal,
+  write what actually happened), `biggestGap`, `evidence[]`, and optionally `void`,
+  `voidReason`, `requirementIds[]`, `judgedAt`, `round` (which round this specific
+  finding was judged in, if it differs from this generation's own `label` -- e.g. a
+  finding carried forward unchanged)), and `failingRequirementIds[]`.
 
 Start a new generation whenever you begin a new build/capture/judge round. Never rewrite
 a past generation file -- if something about it turns out to be wrong, the correction

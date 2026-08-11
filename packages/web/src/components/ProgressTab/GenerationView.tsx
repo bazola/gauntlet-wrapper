@@ -2,10 +2,11 @@ import type { GenerationRecord } from '@gauntlet-wrapper/shared';
 import { LaneTable } from './LaneTable';
 
 interface GenerationViewProps {
+  projectId: string;
   generation: GenerationRecord;
 }
 
-export function GenerationView({ generation }: GenerationViewProps) {
+export function GenerationView({ projectId, generation }: GenerationViewProps) {
   const perf = generation.performanceGate;
 
   return (
@@ -31,7 +32,7 @@ export function GenerationView({ generation }: GenerationViewProps) {
 
       <p style={{ fontSize: '0.85rem', margin: '0.5rem 0' }}>{generation.statusNote}</p>
 
-      <LaneTable lanes={generation.lanes} />
+      <LaneTable projectId={projectId} lanes={generation.lanes} />
 
       {generation.failingRequirementIds.length > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#e88', marginTop: '0.5rem' }}>
