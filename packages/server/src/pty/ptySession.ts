@@ -24,7 +24,55 @@ const BRACKETED_PASTE_END = '\x1b[201~';
 // per explicit user instruction, permission prompts are always skipped. This
 // is the one place that decision lives; there is deliberately no per-project
 // or UI toggle for it.
-const CLAUDE_LAUNCH_COMMAND = 'claude --dangerously-skip-permissions\r';
+//
+// The command itself is configurable (GAUNTLET_WRAPPER_CLAUDE_COMMAND) for
+// setups where `claude` isn't the right thing to type -- e.g. it's shadowed
+// by a wrapper script, or the real CLI is installed under a different name.
+const CLAUDE_LAUNCH_COMMAND = `${process.env.GAUNTLET_WRAPPER_CLAUDE_COMMAND ?? 'claude --dangerously-skip-permissions'}\r`;
+
+// GAUNTLET_WRAPPER_CLAUDE_ENV: comma-separated KEY=VALUE pairs applied to the
+// launched shell's environment on top of whatever the wrapper server itself
+// inherited. An empty VALUE deletes the variable instead of setting it.
+//
+// This exists because `claude` often isn't configured purely by its own
+// install -- environment variables like ANTHROPIC_BASE_URL/ANTHROPIC_API_KEY
+// can be set globally (e.g. by a local API router/proxy such as
+// claude-code-router) to redirect *every* `claude` invocation on the machine
+// through something other than the real Anthropic API. If the wrapper server
+// process inherits those, every session it launches silently goes through
+// that redirect too, which can break gauntlet runs in ways that look like
+// "claude is broken" but are really "claude is pointed somewhere unexpected".
+//
+// Use this to strip or override just for wrapper-launched sessions, without
+// touching your normal shell setup. Example, to force the real Anthropic API
+// regardless of a locally configured router, and use a separate config dir
+// so it doesn't share credentials/state with your routed setup:
+//   GAUNTLET_WRAPPER_CLAUDE_ENV=ANTHROPIC_API_KEY=,ANTHROPIC_AUTH_TOKEN=,ANTHROPIC_BASE_URL=,CLAUDE_CONFIG_DIR=C:\Users\me\.claude-real
+function parseClaudeEnvOverrides(raw: string | undefined): Array<[string, string | undefined]> {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      if (eq === -1) return [pair, undefined] as [string, string | undefined];
+      const value = pair.slice(eq + 1);
+      return [pair.slice(0, eq).trim(), value.length > 0 ? value : undefined] as [
+        string,
+        string | undefined,
+      ];
+    });
+}
+
+function resolveClaudeEnv(): Record<string, string> {
+  const env = { ...(process.env as Record<string, string>) };
+  for (const [key, value] of parseClaudeEnvOverrides(process.env.GAUNTLET_WRAPPER_CLAUDE_ENV)) {
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
+  return env;
+}
 
 export type PtyDataListener = (data: string) => void;
 export type PtyExitListener = (info: { exitCode: number; signal?: number }) => void;
@@ -62,7 +110,7 @@ export class PtySession {
       cols: 80,
       rows: 24,
       cwd,
-      env: process.env as Record<string, string>,
+      env: resolveClaudeEnv(),
       useConpty: process.platform === 'win32',
     });
 
