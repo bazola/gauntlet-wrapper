@@ -84,11 +84,14 @@ performance-shaped and a correctness-shaped lane both get reported every round.
 Four lanes are standing -- active every round, for every project, no matter what
 references exist:
 
-- **Performance** -- see S6. This lane gates the round: if this round's performance
-  evidence is stale, missing, or failing, every other lane's verdict this round still
-  gets recorded, but flagged `void: true` with a `voidReason`. Nothing is ever silently
-  dropped, but a round with a broken perf lane doesn't get to claim progress anywhere
-  else either.
+- **Performance** -- see S6. Checked on a cadence (every 5th round, not continuously --
+  S6 has the details), not every single round. On a round where a check is due, this lane
+  gates the round: if that round's performance evidence is stale, missing, or failing,
+  every other lane's verdict this round still gets recorded, but flagged `void: true`
+  with a `voidReason`. Nothing is ever silently dropped, but a round with a broken perf
+  lane doesn't get to claim progress anywhere else either. On the rounds in between, a
+  plain `performanceGate.evaluated: false` is the honest, expected value and does **not**
+  void anything else that round.
 - **Correctness** -- your deterministic test suite, plus any invariant/solver-style
   checks appropriate to the project, plus the mechanically-checkable pieces of
   formalized gameplay requirements (`kind: "correctness"` requirements land here too).
@@ -166,8 +169,15 @@ Cross-cutting rules, all lanes:
   lanes). Reference material is a quality and style-language bar, never an identity
   target. Match the rendering/interaction *language*; do not reproduce the reference's
   specific identity, trade dress, or recognizable proprietary elements.
-- **One gap per lane per round.** A critic's verdict names the single biggest remaining
-  gap. The builder fixes that, not a laundry list.
+- **Top 3 gaps per round.** Each active lane's critic still names the single biggest
+  remaining gap in its own verdict, same as before -- one `biggestGap` per lane, so the
+  record stays lane-by-lane and comparable round to round. But the builder no longer
+  works every lane's gap mechanically: once all this round's verdicts are in, triage
+  across every lane's reported gap and pick the 3 most important to actually fix this
+  round, in priority order. Gaps that don't make the cut stay reported -- they'll surface
+  again in that lane's next verdict and re-enter a future round's triage -- nothing is
+  dropped, just deprioritized. Note which 3 were picked and why in `state.json`'s
+  `statusNote`.
 - **Blind A/B** (Visual, Visual Adversarial, and Temporal lanes). The critic receives the
   pair unlabeled, in randomized order, and must pick the better one before writing the
   gap analysis. The Adversarial Pass may reuse the same capture pair the standard Visual
@@ -175,6 +185,17 @@ Cross-cutting rules, all lanes:
   it unlabeled and independently randomized.
 
 ## 6. Performance lane mechanics
+
+**Cadence.** Run the performance harness at kickoff (generation 0) to establish a
+baseline, then every 5th round after that (generation a multiple of 5) -- not every
+single round; a full perf pass is expensive and doesn't need to gate rounds that are
+mid-way through a single lane's fix. Track this yourself against the generation number
+you're about to write (e.g. `generation % 5 === 0`). On an off-cadence round, write
+`performanceGate: { evaluated: false }` rather than skipping the field or fabricating a
+result -- S5 already covers that this doesn't void other lanes. If you notice a round's
+change plausibly affects performance in a way that can't wait for the next scheduled
+check, running the harness early is fine; the cadence is a floor on frequency, not a
+ceiling.
 
 Once you've determined `projectType` in S1:
 
@@ -254,7 +275,7 @@ cites the telemetry or replay capture that shows the described behavior.
 
 ## 9. Loop discipline
 
-Build, capture, judge, fix the single biggest gap, repeat. Don't stop after a fixed
+Build, capture, judge, triage and fix the round's top 3 gaps (S5), repeat. Don't stop after a fixed
 number of rounds -- keep going until the human stops you. Periodically (roughly once per
 major wave of work) run one fresh pass over the whole project specifically looking for
 seams and inconsistencies between separately-improved pieces -- it fixes rough edges, it

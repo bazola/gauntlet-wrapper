@@ -1,11 +1,13 @@
 # Performance Contract Schema
 
-Every gauntlet project has a standing Performance lane that must report every round -- it
-gates every other lane's verdicts (a round with stale, missing, or failing performance
-evidence still gets its other lane verdicts recorded, but flagged `void: true`). This
-document defines the shape that report takes for a project that doesn't render frames --
-no browser-canvas/browser-webgpu starter harness applies here. You build the harness;
-this document defines only the shape it must fill.
+Every gauntlet project has a standing Performance lane that reports on a cadence -- a
+baseline at kickoff, then every 5th round after that (see KICKOFF S5/S6) -- and gates
+every other lane's verdicts on the rounds it's due (a round with stale, missing, or
+failing performance evidence still gets its other lane verdicts recorded, but flagged
+`void: true`). On rounds where a check isn't due, `evaluated: false` is expected and
+doesn't void anything. This document defines the shape that report takes for a project
+that doesn't render frames -- no browser-canvas/browser-webgpu starter harness applies
+here. You build the harness; this document defines only the shape it must fill.
 
 ## What to measure
 
@@ -40,10 +42,11 @@ Every round's `performanceGate` block in that generation's record
 
 `evidence` must point at a real file this round produced -- a JSON report, a log,
 whatever your harness writes -- containing the actual measured numbers and the budget
-they were checked against. A `performanceGate` with no evidence citation, or
-`evaluated: false`, means this round's other lane verdicts get recorded with
-`void: true` -- the harness must run, and it must run every round, not just when
-something feels slow.
+they were checked against. On a round where the check is due (per the cadence above), a
+`performanceGate` with no evidence citation, or `evaluated: false`, means this round's
+other lane verdicts get recorded with `void: true` -- the harness must actually run on
+its scheduled rounds, not just when something feels slow. On an off-cadence round,
+`evaluated: false` is simply the honest value and voids nothing.
 
 ## Environment signature
 
