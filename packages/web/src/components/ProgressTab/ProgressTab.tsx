@@ -30,6 +30,10 @@ export function ProgressTab({ projectId }: ProgressTabProps) {
 
   const { state, requirements, generations, errors } = snapshot;
   const sortedDesc = [...generations].reverse();
+  // Lets a carried-forward lane's `round` label (KICKOFF S5/S7) resolve to a
+  // real generation number so the UI can link straight to where it was
+  // actually last judged, instead of just printing the label as inert text.
+  const labelToGeneration = new Map(generations.map((g) => [g.label, g.generation]));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -60,7 +64,12 @@ export function ProgressTab({ projectId }: ProgressTabProps) {
         <h3>Generations ({generations.length})</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {sortedDesc.map((gen) => (
-            <GenerationView key={gen.generation} projectId={projectId} generation={gen} />
+            <GenerationView
+              key={gen.generation}
+              projectId={projectId}
+              generation={gen}
+              labelToGeneration={labelToGeneration}
+            />
           ))}
           {generations.length === 0 && <p style={{ color: '#888' }}>No generations recorded yet.</p>}
         </div>

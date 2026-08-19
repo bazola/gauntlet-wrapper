@@ -4,13 +4,17 @@ import { LaneTable } from './LaneTable';
 interface GenerationViewProps {
   projectId: string;
   generation: GenerationRecord;
+  labelToGeneration: Map<string, number>;
 }
 
-export function GenerationView({ projectId, generation }: GenerationViewProps) {
+export function GenerationView({ projectId, generation, labelToGeneration }: GenerationViewProps) {
   const perf = generation.performanceGate;
 
   return (
-    <div style={{ border: '1px solid #333', borderRadius: '4px', padding: '0.75rem', background: '#1b1e24' }}>
+    <div
+      id={`gen-${generation.generation}`}
+      style={{ border: '1px solid #333', borderRadius: '4px', padding: '0.75rem', background: '#1b1e24' }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.5rem' }}>
         <strong>
           Gen {generation.generation} -- {generation.label}
@@ -32,7 +36,7 @@ export function GenerationView({ projectId, generation }: GenerationViewProps) {
 
       <p style={{ fontSize: '0.85rem', margin: '0.5rem 0' }}>{generation.statusNote}</p>
 
-      <LaneTable projectId={projectId} lanes={generation.lanes} />
+      <LaneTable projectId={projectId} lanes={generation.lanes} labelToGeneration={labelToGeneration} />
 
       {generation.failingRequirementIds.length > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#e88', marginTop: '0.5rem' }}>

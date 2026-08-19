@@ -178,6 +178,14 @@ Cross-cutting rules, all lanes:
   again in that lane's next verdict and re-enter a future round's triage -- nothing is
   dropped, just deprioritized. Note which 3 were picked and why in `state.json`'s
   `statusNote`.
+- **Carry forward what wasn't touched.** A lane whose target this round's top-3 picks
+  didn't touch hasn't changed, so don't re-run its critic or re-capture evidence just to
+  produce a fresh-looking entry -- there's nothing new to judge. Instead, copy that
+  lane's previous verdict forward verbatim (`winner`, `biggestGap`, `evidence[]`
+  unchanged), set `unchanged: true`, and set `round` to the generation/round label where
+  it was actually last judged. This is what keeps the Progress tab from filling up with
+  the same screenshot recaptured every round for lanes nothing is happening on --
+  re-judge a lane only when this round's work plausibly changed its outcome.
 - **Blind A/B** (Visual, Visual Adversarial, and Temporal lanes). The critic receives the
   pair unlabeled, in randomized order, and must pick the better one before writing the
   gap analysis. The Adversarial Pass may reuse the same capture pair the standard Visual
@@ -258,7 +266,10 @@ wrapper's Progress tab. Files:
   write what actually happened), `biggestGap`, `evidence[]`, and optionally `void`,
   `voidReason`, `requirementIds[]`, `judgedAt`, `round` (which round this specific
   finding was judged in, if it differs from this generation's own `label` -- e.g. a
-  finding carried forward unchanged)), and `failingRequirementIds[]`.
+  finding carried forward unchanged), `unchanged` (true when this lane is that
+  carried-forward case per S5 -- the wrapper UI uses this to collapse a repeated verdict
+  instead of re-rendering the same evidence every round, so set it whenever it applies,
+  don't leave it implicit)), and `failingRequirementIds[]`.
 
 Start a new generation whenever you begin a new build/capture/judge round. Never rewrite
 a past generation file -- if something about it turns out to be wrong, the correction
@@ -272,6 +283,13 @@ exists on disk from this round is void, and the round repeats -- no exceptions, 
 "trust me." This applies to every lane, not just the visual ones: correctness cites
 test-run output, performance cites the histogram/measurement file, gameplay/behavioral
 cites the telemetry or replay capture that shows the described behavior.
+
+The one exception is a lane carried forward per S5 (`unchanged: true`) -- its evidence
+citation legitimately points at a file from whatever earlier round it was actually
+captured in, not this one. That's the entire point of carrying it forward instead of
+re-judging: the file already on disk from that earlier round is still valid evidence for
+a build that hasn't changed since. Evidence-or-void still applies in full to any lane
+that IS freshly judged this round.
 
 ## 9. Loop discipline
 

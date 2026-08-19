@@ -65,20 +65,43 @@ export async function buildKickoffPrompt(projectPath: string, config: GauntletCo
   });
 }
 
+// A resumed session is a brand-new `claude` process with no memory of the
+// conversation its original kickoff happened in -- referring back to "S5-S9
+// of your original kickoff" is meaningless to it unless that text is actually
+// reproduced here. Slicing it live out of KICKOFF.md.tmpl (rather than
+// hand-duplicating it into RESUME_NOTE.md.tmpl) means a rule change only ever
+// needs to be made in one place and still reaches every future resume.
+const STANDING_RULES_MARKER = '## 5. Reviewer taxonomy';
+
+function extractStandingRules(kickoffTemplate: string): string {
+  const idx = kickoffTemplate.indexOf(STANDING_RULES_MARKER);
+  if (idx === -1) return kickoffTemplate.trim();
+  return kickoffTemplate.slice(idx).trimEnd();
+}
+
 export async function buildResumeNote(
   projectPath: string,
   config: GauntletConfig,
   currentGeneration: number,
 ): Promise<string> {
   void projectPath; // not needed yet, kept for signature symmetry with buildKickoffPrompt
-  const template = await readFile(join(TEMPLATES_DIR, 'RESUME_NOTE.md.tmpl'), 'utf8');
+  const [template, kickoffTemplate, perfSchema] = await Promise.all([
+    readFile(join(TEMPLATES_DIR, 'RESUME_NOTE.md.tmpl'), 'utf8'),
+    readFile(join(TEMPLATES_DIR, 'KICKOFF.md.tmpl'), 'utf8'),
+    readFile(join(TEMPLATES_DIR, 'PERF_CONTRACT_SCHEMA.md'), 'utf8'),
+  ]);
   const projectDocsList =
     config.projectDocs.length > 0
       ? config.projectDocs.map((f) => `   - ${f}`).join('\n')
       : '   (none recorded)';
+  const standingRules = render(extractStandingRules(kickoffTemplate), {
+    REVIEWER_MODEL: config.reviewerModel,
+    PERF_CONTRACT_SCHEMA: perfSchema,
+  });
   return render(template, {
     PROJECT_DISPLAY_NAME: config.displayName,
     CURRENT_GENERATION: String(currentGeneration),
     PROJECT_DOCS_LIST: projectDocsList,
+    STANDING_RULES: standingRules,
   });
 }

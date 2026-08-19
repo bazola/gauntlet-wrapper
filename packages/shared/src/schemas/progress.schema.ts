@@ -31,6 +31,14 @@ export const LaneVerdictSchema = z.object({
   // it differs from the generation record's own label -- e.g. a finding
   // carried forward unchanged from an earlier round.
   round: z.string().optional(),
+  // True when this lane wasn't re-judged this generation -- the builder's top
+  // 3 picks (KICKOFF S5) didn't touch it, so the critic didn't re-capture or
+  // re-judge it; winner/biggestGap/evidence are copied forward verbatim from
+  // `round`. Distinct from `round` alone (which can also label a genuinely
+  // fresh sub-round judged under a different name) -- this is the explicit
+  // signal the wrapper UI uses to collapse a repeated, unchanged verdict
+  // instead of re-rendering the same evidence images every generation.
+  unchanged: z.boolean().optional(),
 });
 export type LaneVerdict = z.infer<typeof LaneVerdictSchema>;
 

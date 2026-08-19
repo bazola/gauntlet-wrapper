@@ -3,6 +3,7 @@ import type { LaneVerdict } from '@gauntlet-wrapper/shared';
 interface LaneTableProps {
   projectId: string;
   lanes: LaneVerdict[];
+  labelToGeneration: Map<string, number>;
 }
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
@@ -70,7 +71,34 @@ function EvidenceList({ projectId, evidence }: { projectId: string; evidence: st
   );
 }
 
-export function LaneTable({ projectId, lanes }: LaneTableProps) {
+// Carried-forward lane (KICKOFF S5: `unchanged: true`) -- nothing this round
+// touched it, so its evidence is a repeat of whatever was last captured for
+// it. Showing that same image gallery again every round is exactly the
+// visual noise this collapses: a one-line note plus a jump link to the
+// generation where it was actually last judged, instead of re-rendering
+// screenshots that haven't changed.
+function UnchangedNotice({ round, labelToGeneration }: { round: string | undefined; labelToGeneration: Map<string, number> }) {
+  const targetGeneration = round ? labelToGeneration.get(round) : undefined;
+  return (
+    <span style={{ color: '#888', fontStyle: 'italic' }}>
+      unchanged
+      {round && (
+        <>
+          {' -- last judged '}
+          {targetGeneration !== undefined ? (
+            <a href={`#gen-${targetGeneration}`} style={{ color: '#8cf', fontStyle: 'normal' }}>
+              {round} ↓
+            </a>
+          ) : (
+            round
+          )}
+        </>
+      )}
+    </span>
+  );
+}
+
+export function LaneTable({ projectId, lanes, labelToGeneration }: LaneTableProps) {
   if (lanes.length === 0) return <p style={{ color: '#888', fontSize: '0.85rem' }}>No lane verdicts recorded.</p>;
 
   return (
@@ -88,7 +116,7 @@ export function LaneTable({ projectId, lanes }: LaneTableProps) {
           <tr key={lane.id} style={{ borderBottom: '1px solid #22252b', opacity: lane.void ? 0.55 : 1 }}>
             <td style={{ padding: '0.3rem 0.5rem', fontFamily: 'ui-monospace, monospace', verticalAlign: 'top' }}>
               {lane.id}
-              {lane.round && <div style={{ fontSize: '0.7rem', color: '#888' }}>{lane.round}</div>}
+              {lane.round && !lane.unchanged && <div style={{ fontSize: '0.7rem', color: '#888' }}>{lane.round}</div>}
               {lane.void && (
                 <span style={{ display: 'block', marginTop: '0.2rem', color: '#e88', fontSize: '0.75rem' }}>
                   VOID{lane.voidReason ? `: ${lane.voidReason}` : ''}
@@ -100,7 +128,11 @@ export function LaneTable({ projectId, lanes }: LaneTableProps) {
               {lane.biggestGap || <em style={{ color: '#666' }}>(none)</em>}
             </td>
             <td style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', verticalAlign: 'top' }}>
-              <EvidenceList projectId={projectId} evidence={lane.evidence} />
+              {lane.unchanged ? (
+                <UnchangedNotice round={lane.round} labelToGeneration={labelToGeneration} />
+              ) : (
+                <EvidenceList projectId={projectId} evidence={lane.evidence} />
+              )}
             </td>
           </tr>
         ))}
